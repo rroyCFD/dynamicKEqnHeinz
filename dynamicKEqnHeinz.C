@@ -167,7 +167,87 @@ dynamicKEqnHeinz<BasicTurbulenceModel>::dynamicKEqnHeinz
         transport,
         propertiesName
     ),
-
+    Ck_
+    (
+        dimensioned<scalar>::lookupOrAddToDict
+        (
+            "Ck",
+            this->coeffDict_,
+            0.1
+        )
+    ),
+    Ckmin_
+    (
+        dimensioned<scalar>::lookupOrAddToDict
+        (
+            "Ckmin",
+            this->coeffDict_,
+            -0.05
+        )
+    ),
+    Ckmax_
+    (
+        dimensioned<scalar>::lookupOrAddToDict
+        (
+            "Ckmax",
+            this->coeffDict_,
+            0.5
+        )
+    ),
+    Cnmin_
+    (
+        dimensioned<scalar>::lookupOrAddToDict
+        (
+            "Cnmin",
+            this->coeffDict_,
+            0.
+        )
+    ),
+    Cnmax_
+    (
+        dimensioned<scalar>::lookupOrAddToDict
+        (
+            "Cnmax",
+            this->coeffDict_,
+            5.0
+        )
+    ),
+    filterRatio_
+    (
+        dimensioned<scalar>::lookupOrAddToDict
+        (
+            "filterRatio",
+            this->coeffDict_,
+            2.0
+        )
+    ),
+    nonLinear_
+    (
+        Switch::lookupOrAddToDict
+        (
+            "nonLinear",
+            this->coeffDict_,
+            false
+        )
+     ),
+    dynamic_
+    (
+        Switch::lookupOrAddToDict
+        (
+            "dynamic",
+            this->coeffDict_,
+            true
+        )
+     ),
+    damping_
+    (
+        Switch::lookupOrAddToDict
+        (
+            "damping",
+            this->coeffDict_,
+            true
+        )
+     ),
     k_
     (
         IOobject
@@ -180,7 +260,44 @@ dynamicKEqnHeinz<BasicTurbulenceModel>::dynamicKEqnHeinz
         ),
         this->mesh_
     ),
-
+    Ckd_
+    (
+        IOobject
+        (
+            IOobject::groupName("Ckd", this->alphaRhoPhi_.group()),
+            this->runTime_.timeName(),
+            this->mesh_,
+            IOobject::NO_READ,
+            IOobject::AUTO_WRITE
+        ),
+        this->mesh_,
+        dimensionedScalar("Ckd", dimless, SMALL)
+    ),
+    Cnd_
+    (
+        IOobject
+        (
+            IOobject::groupName("Cnd", this->alphaRhoPhi_.group()),
+            this->runTime_.timeName(),
+            this->mesh_,
+            IOobject::NO_READ,
+            IOobject::AUTO_WRITE
+        ),
+        this->mesh_,
+        dimensionedScalar("Cnd", dimless, SMALL)
+    ),
+    N_
+    (
+        IOobject
+        (
+            IOobject::groupName("N", this->alphaRhoPhi_.group()),
+            this->runTime_.timeName(),
+            this->mesh_,
+            IOobject::MUST_READ,
+            IOobject::AUTO_WRITE
+        ),
+        this->mesh_
+    ),
     simpleFilter_(this->mesh_),
     filterPtr_(LESfilter::New(this->mesh_, this->coeffDict())),
     filter_(filterPtr_())

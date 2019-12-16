@@ -86,10 +86,25 @@ protected:
 
     // Protected data
 
+        // Model constants
+            dimensionedScalar Ck_;
+            dimensionedScalar Ckmin_;
+            dimensionedScalar Ckmax_;
+            dimensionedScalar Cnmin_;
+            dimensionedScalar Cnmax_;
+
+            dimensionedScalar filterRatio_;
+
+            const Switch  nonLinear_;
+            const Switch  dynamic_;
+            const Switch  damping_;
+
         // Fields
 
             volScalarField k_;
-
+            volScalarField Ckd_;
+            volScalarField Cnd_;
+            volSymmTensorField N_;
 
         // Filters
 
