@@ -130,12 +130,30 @@ template<class BasicTurbulenceModel>
 void dynamicKEqnHeinz<BasicTurbulenceModel>::correctNut()
 {
     this->nut_= Ckd_* this->delta() * sqrt(k_);
+
+    // If non-dynamic, apply damping function if required
+    if(!dynamic_ && damping_)
+    {
+        // damping function
+        volScalarField Ret = this->nut_ / this->nu();
+        volScalarField fmu_ =
+          0.09 + (0.91 + 1./pow(Ret+SMALL,3)) * (1.0 - exp(-pow(Ret/25.,2.75)));
+        this ->nut_ *= fmu_;
+    }
+
     this->nut_.correctBoundaryConditions();
     fv::options::New(this->mesh_).correct(this->nut_);
 
     BasicTurbulenceModel::correctNut();
 }
 
+
+template<class BasicTurbulenceModel>
+void dynamicKEqnHeinz<BasicTurbulenceModel>::correctB()
+{
+    B_= ((2.0/3.0)*I)*k_ - 2.0*this->nut_*symm(dev(fvc::grad(this->U_))) + N_;
+    B_.correctBoundaryConditions();
+}
 
 // template<class BasicTurbulenceModel>
 // tmp<fvScalarMatrix> dynamicKEqnHeinz<BasicTurbulenceModel>::kSource() const
@@ -309,6 +327,20 @@ dynamicKEqnHeinz<BasicTurbulenceModel>::dynamicKEqnHeinz
         ),
         this->mesh_
     ),
+    B_
+    (
+        IOobject
+        (
+            IOobject::groupName("B", this->alphaRhoPhi_.group()),
+            this->runTime_.timeName(),
+            this->mesh_,
+            IOobject::NO_READ,
+            IOobject::AUTO_WRITE
+        ),
+        this->mesh_,
+        dimensionedSymmTensor
+            ("B", dimensionSet(0, 2, -2, 0, 0, 0, 0), symmTensor::zero)
+    ),
     simpleFilter_(this->mesh_),
     filterPtr_(LESfilter::New(this->mesh_, this->coeffDict())),
     filter_(filterPtr_())
@@ -329,6 +361,17 @@ bool dynamicKEqnHeinz<BasicTurbulenceModel>::read()
 {
     if (LESeddyViscosity<BasicTurbulenceModel>::read())
     {
+
+        Ckmin_.readIfPresent(this->coeffDict());
+        Ckmax_.readIfPresent(this->coeffDict());
+        Cnmin_.readIfPresent(this->coeffDict());
+        Cnmax_.readIfPresent(this->coeffDict());
+        filterRatio_.readIfPresent(this->coeffDict());
+
+        nonLinear_.readIfPresent("nonLinear", this->coeffDict());
+        dynamic_.readIfPresent("dynamic", this->coeffDict());
+        damping_.readIfPresent("damping", this->coeffDict());
+
         filter_.read(this->coeffDict());
 
         return true;
@@ -371,8 +414,6 @@ void dynamicKEqnHeinz<BasicTurbulenceModel>::correct()
 
     // Incomplete tasks
     // Fix Ce in kEqn
-    // define SGS stress B()
-    // Write memberfunction N_ and divDevBeff()
 
     // Local references
     const alphaField& alpha = this->alpha_;
@@ -535,6 +576,13 @@ void dynamicKEqnHeinz<BasicTurbulenceModel>::correct()
 
     // update SGS viscosity
     correctNut();
+
+    // update NonLinear Stress
+    N_ = - Cnd_ * sqr(this->delta()) *
+        (twoSymm(Sijd & Rotij) - twoSymm(Sijd & Sijd) + 2./3.*I*(Sijd && Sijd));
+    N_.correctBoundaryConditions();
+
+
 
 }
 

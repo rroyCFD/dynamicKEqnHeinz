@@ -95,9 +95,9 @@ protected:
 
             dimensionedScalar filterRatio_;
 
-            const Switch  nonLinear_;
-            const Switch  dynamic_;
-            const Switch  damping_;
+            Switch  nonLinear_;
+            Switch  dynamic_;
+            Switch  damping_;
 
         // Fields
 
@@ -105,6 +105,7 @@ protected:
             volScalarField Ckd_;
             volScalarField Cnd_;
             volSymmTensorField N_;
+            volSymmTensorField B_;
 
         // Filters
 
@@ -139,8 +140,9 @@ protected:
         );
 
         virtual void correctNut();
+        virtual void correctB();
 
-        virtual tmp<fvScalarMatrix> kSource() const;
+        // virtual tmp<fvScalarMatrix> kSource() const;
 
 
 public:
@@ -188,6 +190,23 @@ public:
 
         //- Return sub-grid disipation rate
         virtual tmp<volScalarField> epsilon() const;
+
+        //- Return sub-grid scale stress
+        virtual tmp<volSymmTensorField> B() const
+        {
+            return B_;
+        }
+
+        // Used in the RHS of momentum equation.
+        tmp<fvVectorMatrix> divDevBeff(volVectorField& U) const
+        {
+            return
+            (
+                - fvm::laplacian(this->nuEff_, U)
+                - fvc::div(this->nuEff_*dev(T(fvc::grad(U))))
+                + fvc::div(N_)
+            );
+        }
 
         //- Return the effective diffusivity for k
         tmp<volScalarField> DkEff() const
