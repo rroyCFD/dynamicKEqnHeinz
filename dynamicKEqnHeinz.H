@@ -58,7 +58,7 @@ SourceFiles
 
 #include "LESeddyViscosity.H"
 #include "simpleFilter.H"
-
+#include "bound.H"
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
 namespace Foam
@@ -92,11 +92,12 @@ protected:
             dimensionedScalar Ckmax_;
             dimensionedScalar Cnmin_;
             dimensionedScalar Cnmax_;
+            dimensionedScalar Ce_;
 
             dimensionedScalar filterRatio_;
 
-            Switch  nonLinear_;
             Switch  dynamic_;
+            Switch  nonLinear_;
             Switch  damping_;
 
         // Fields
@@ -123,27 +124,9 @@ protected:
             const volScalarField& KK
         ) const;
 
-        //- Calculate Ce by filtering the velocity field U
-        volScalarField Ce
-        (
-            const volSymmTensorField& D,
-            const volScalarField& KK
-        ) const;
-
-        volScalarField Ce() const;
-
         //- Update sub-grid eddy-viscosity
-        void correctNut
-        (
-            const volSymmTensorField& D,
-            const volScalarField& KK
-        );
-
         virtual void correctNut();
         virtual void correctB();
-
-        // virtual tmp<fvScalarMatrix> kSource() const;
-
 
 public:
 
