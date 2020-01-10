@@ -90,22 +90,22 @@ protected:
             dimensionedScalar Ck_;
             dimensionedScalar Ckmin_;
             dimensionedScalar Ckmax_;
-            dimensionedScalar Cnmin_;
-            dimensionedScalar Cnmax_;
+            // dimensionedScalar Cnmin_;
+            // dimensionedScalar Cnmax_;
             dimensionedScalar Ce_;
 
             dimensionedScalar filterRatio_;
 
             Switch  dynamic_;
-            Switch  nonLinear_;
-            Switch  damping_;
+            // Switch  nonLinear_;
+            // Switch  damping_;
 
         // Fields
 
             volScalarField k_;
             volScalarField Ckd_;
-            volScalarField Cnd_;
-            volSymmTensorField N_;
+            // volScalarField Cnd_;
+            // volSymmTensorField N_;
             volSymmTensorField B_;
 
         // Filters
@@ -180,7 +180,7 @@ public:
             (
                 - fvm::laplacian(this->nuEff_, U)
                 - fvc::div(this->nuEff_*dev(T(fvc::grad(U))))
-                + fvc::div(N_)
+                // + fvc::div(N_)
             );
         }
 
