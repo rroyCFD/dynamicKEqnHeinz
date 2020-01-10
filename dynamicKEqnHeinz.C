@@ -35,97 +35,6 @@ namespace LESModels
 
 // * * * * * * * * * * * * Protected Member Functions  * * * * * * * * * * * //
 
-// template<class BasicTurbulenceModel>
-// volScalarField dynamicKEqnHeinz<BasicTurbulenceModel>::Ck
-// (
-//     const volSymmTensorField& D,
-//     const volScalarField& KK
-// ) const
-// {
-//     const volSymmTensorField LL
-//     (
-//         simpleFilter_(dev(filter_(sqr(this->U_)) - (sqr(filter_(this->U_)))))
-//     );
-
-//     const volSymmTensorField MM
-//     (
-//         simpleFilter_(-2.0*this->delta()*sqrt(KK)*filter_(D))
-//     );
-
-//     const volScalarField Ck
-//     (
-//         simpleFilter_(0.5*(LL && MM))
-//        /(
-//             simpleFilter_(magSqr(MM))
-//           + dimensionedScalar("small", sqr(MM.dimensions()), vSmall)
-//         )
-//     );
-
-//     tmp<volScalarField> tfld = 0.5*(mag(Ck) + Ck);
-//     return tfld();
-// }
-
-
-template<class BasicTurbulenceModel>
-volScalarField dynamicKEqnHeinz<BasicTurbulenceModel>::Ce
-(
-    const volSymmTensorField& D,
-    const volScalarField& KK
-) const
-{
-    const volScalarField Ce
-    (
-        simpleFilter_(this->nuEff()*(filter_(magSqr(D)) - magSqr(filter_(D))))
-       /simpleFilter_(pow(KK, 1.5)/(2.0*this->delta()))
-    );
-
-    tmp<volScalarField> tfld = 0.5*(mag(Ce) + Ce);
-    return tfld();
-}
-
-
-template<class BasicTurbulenceModel>
-volScalarField dynamicKEqnHeinz<BasicTurbulenceModel>::Ce() const
-{
-    const volSymmTensorField D(dev(symm(fvc::grad(this->U_))));
-
-    volScalarField KK
-    (
-        0.5*(filter_(magSqr(this->U_)) - magSqr(filter_(this->U_)))
-    );
-    KK.max(dimensionedScalar("small", KK.dimensions(), small));
-
-    return Ce(D, KK);
-}
-
-
-// template<class BasicTurbulenceModel>
-// void dynamicKEqnHeinz<BasicTurbulenceModel>::correctNut
-// (
-//     const volSymmTensorField& D,
-//     const volScalarField& KK
-// )
-// {
-//     this->nut_ = Ck(D, KK)*sqrt(k_)*this->delta();
-//     this->nut_.correctBoundaryConditions();
-//     fv::options::New(this->mesh_).correct(this->nut_);
-
-//     BasicTurbulenceModel::correctNut();
-// }
-
-
-// template<class BasicTurbulenceModel>
-// void dynamicKEqnHeinz<BasicTurbulenceModel>::correctNut()
-// {
-//     const volScalarField KK
-//     (
-//         0.5*(filter_(magSqr(this->U_)) - magSqr(filter_(this->U_)))
-//     );
-
-//     correctNut(symm(fvc::grad(this->U_)), KK);
-// }
-
-
 template<class BasicTurbulenceModel>
 void dynamicKEqnHeinz<BasicTurbulenceModel>::correctNut()
 {
@@ -155,19 +64,6 @@ void dynamicKEqnHeinz<BasicTurbulenceModel>::correctB()
     B_.correctBoundaryConditions();
 }
 
-// template<class BasicTurbulenceModel>
-// tmp<fvScalarMatrix> dynamicKEqnHeinz<BasicTurbulenceModel>::kSource() const
-// {
-//     return tmp<fvScalarMatrix>
-//     (
-//         new fvScalarMatrix
-//         (
-//             k_,
-//             dimVolume*this->rho_.dimensions()*k_.dimensions()
-//             /dimTime
-//         )
-//     );
-// }
 
 
 // * * * * * * * * * * * * * * * * Constructors  * * * * * * * * * * * * * * //
@@ -241,6 +137,15 @@ dynamicKEqnHeinz<BasicTurbulenceModel>::dynamicKEqnHeinz
             5.0
         )
     ),
+    Ce_
+    (
+        dimensioned<scalar>::lookupOrAddToDict
+        (
+            "Ce",
+            this->coeffDict_,
+            1.048
+        )
+    ),
     filterRatio_
     (
         dimensioned<scalar>::lookupOrAddToDict
@@ -248,6 +153,15 @@ dynamicKEqnHeinz<BasicTurbulenceModel>::dynamicKEqnHeinz
             "filterRatio",
             this->coeffDict_,
             2.0
+        )
+    ),
+    dynamic_
+    (
+        Switch::lookupOrAddToDict
+        (
+            "dynamic",
+            this->coeffDict_,
+            true
         )
     ),
     nonLinear_
@@ -258,25 +172,16 @@ dynamicKEqnHeinz<BasicTurbulenceModel>::dynamicKEqnHeinz
             this->coeffDict_,
             false
         )
-     ),
-    dynamic_
-    (
-        Switch::lookupOrAddToDict
-        (
-            "dynamic",
-            this->coeffDict_,
-            true
-        )
-     ),
+    ),
     damping_
     (
         Switch::lookupOrAddToDict
         (
             "damping",
             this->coeffDict_,
-            true
+            false
         )
-     ),
+    ),
     k_
     (
         IOobject
@@ -347,6 +252,9 @@ dynamicKEqnHeinz<BasicTurbulenceModel>::dynamicKEqnHeinz
 {
     bound(k_, this->kMin_);
 
+    // update SGS stress B
+    correctB();
+
     if (type == typeName)
     {
         this->printCoeffs(type);
@@ -366,6 +274,7 @@ bool dynamicKEqnHeinz<BasicTurbulenceModel>::read()
         Ckmax_.readIfPresent(this->coeffDict());
         Cnmin_.readIfPresent(this->coeffDict());
         Cnmax_.readIfPresent(this->coeffDict());
+        Ce_.readIfPresent(this->coeffDict());
         filterRatio_.readIfPresent(this->coeffDict());
 
         nonLinear_.readIfPresent("nonLinear", this->coeffDict());
@@ -398,7 +307,7 @@ tmp<volScalarField> dynamicKEqnHeinz<BasicTurbulenceModel>::epsilon() const
                 IOobject::NO_READ,
                 IOobject::NO_WRITE
             ),
-            Ce()*k()*sqrt(k())/this->delta()
+            Ce_*k()*sqrt(k())/this->delta()
         )
     );
 }
@@ -411,27 +320,27 @@ void dynamicKEqnHeinz<BasicTurbulenceModel>::correct()
     {
         return;
     }
-
-    // Incomplete tasks
-    // Fix Ce in kEqn
-
     // Local references
     const alphaField& alpha = this->alpha_;
     const rhoField& rho = this->rho_;
     const surfaceScalarField& alphaRhoPhi = this->alphaRhoPhi_;
     const volVectorField& U = this->U_;
-    volScalarField& nut = this->nut_;
+    // volScalarField& nut = this->nut_;
     fv::options& fvOptions(fv::options::New(this->mesh_));
 
     LESeddyViscosity<BasicTurbulenceModel>::correct();
 
     tmp<volTensorField> tgradU(fvc::grad(U));
 
-    // S_ij-d and Omega_ij:
-    // a) Important!!!! OpenFOAM defines grad(U) = dU_j/dxi -> hence we have to use grad(U)^T (transpose) to make it match our cart. tensor notation!
-    // b) gradU.T() should be trace-less due to continuity equation but deviates slightly due to numerics
+    /*
+    S_ij-d and Omega_ij:
 
-    const volSymmTensorField D(dev(symm(tgradU()))); // comment this
+    a) Important!!!! OpenFOAM defines grad(U) = dU_j/dxi -> hence we have to
+    use grad(U)^T (transpose) to make it match our Cartesian tensor notation!
+    b) gradU.T() should be trace-less due to continuity equation but deviates
+    slightly due to numerics
+    */
+
     const volSymmTensorField Sijd (dev(symm(tgradU())));
     const volTensorField     Rotij(skew(tgradU().T()));
 
@@ -439,9 +348,6 @@ void dynamicKEqnHeinz<BasicTurbulenceModel>::correct()
     // (careful -> use Stefans deifinition abs(L) = sqrt(2 Lij Lji)
     const volSymmTensorField SijdF  = dev(filter_(Sijd)); // this is D
     const volScalarField magSf = sqrt(2.) * mag(SijdF);
-
-    // volScalarField KK(0.5*(filter_(magSqr(U)) - magSqr(filter_(U))));
-    // KK.max(dimensionedScalar("small", KK.dimensions(), small));
 
     // Leonard stress --------------------------------------------------------//
     volSymmTensorField Lijd = (filter_(sqr(U)) - (sqr(filter_(U))));
@@ -451,13 +357,9 @@ void dynamicKEqnHeinz<BasicTurbulenceModel>::correct()
     Lijd = dev(Lijd);
     const volScalarField magLd = sqrt(2.) * mag(Lijd);
 
-    const volScalarField G(this->GName(), 2.0*nut*(tgradU() && D));
-    // const volScalarField G(this->GName(), 0.5*tr(-twoSymm(B() & tgradU())));
+    const volScalarField G(this->GName(), 0.5*tr(-twoSymm(B() & tgradU())));
     tgradU.clear();
 
-
-    // Test-filter width
-    volScalarField deltaT = filterRatio_*this->delta();
 
     if (dynamic_)
     {
@@ -468,6 +370,9 @@ void dynamicKEqnHeinz<BasicTurbulenceModel>::correct()
             dimensionSet(0, 2, -3, 0, 0, 0, 0),
             SMALL
         );
+
+        // Test-filter width
+        volScalarField deltaT = filterRatio_*this->delta();
 
         // Non-Linear Model
         if (nonLinear_)
@@ -521,7 +426,8 @@ void dynamicKEqnHeinz<BasicTurbulenceModel>::correct()
         }
         else
         {
-            const volScalarField rLS = (Lijd  && SijdF)/ (0.5*magLd*magSf + small1);
+            const volScalarField rLS =
+                (Lijd  && SijdF)/ (0.5*magLd*magSf + small1);
 
             // Calculate the dynamic coeffcients
             Ckd_.primitiveFieldRef() =
@@ -530,7 +436,6 @@ void dynamicKEqnHeinz<BasicTurbulenceModel>::correct()
                 ((2.*(deltaT*sqrt(max(ktest,this->kMin_*0.)))*magSf)
                 + this->kMin_)
             );
-
 
             Cnd_.primitiveFieldRef() = 0.* Ckd_;
 
@@ -564,7 +469,7 @@ void dynamicKEqnHeinz<BasicTurbulenceModel>::correct()
       - fvm::laplacian(alpha*rho*DkEff(), k_)
     ==
         alpha*rho*G
-      - fvm::Sp(Ce()*alpha*rho*sqrt(k_)/this->delta(), k_) // fix Ce()
+      - fvm::Sp(Ce_*alpha*rho*sqrt(k_)/this->delta(), k_) // fix Ce()
       + fvOptions(alpha, rho, k_)
     );
 
@@ -581,8 +486,6 @@ void dynamicKEqnHeinz<BasicTurbulenceModel>::correct()
     N_ = - Cnd_ * sqr(this->delta()) *
         (twoSymm(Sijd & Rotij) - twoSymm(Sijd & Sijd) + 2./3.*I*(Sijd && Sijd));
     N_.correctBoundaryConditions();
-
-
 
 }
 
