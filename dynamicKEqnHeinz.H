@@ -117,13 +117,6 @@ protected:
 
     // Protected Member Functions
 
-        //- Calculate Ck by filtering the velocity field U
-        volScalarField Ck
-        (
-            const volSymmTensorField& D,
-            const volScalarField& KK
-        ) const;
-
         //- Update sub-grid eddy-viscosity
         virtual void correctNut();
         virtual void correctB();
