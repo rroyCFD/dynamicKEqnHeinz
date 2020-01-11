@@ -87,7 +87,7 @@ dynamicKEqnHeinz<BasicTurbulenceModel>::dynamicKEqnHeinz
         (
             "Ck",
             this->coeffDict_,
-            0.1
+            0.094
         )
     ),
     Ckmin_
@@ -275,8 +275,15 @@ void dynamicKEqnHeinz<BasicTurbulenceModel>::correct()
 
     // Leonard stress --------------------------------------------------------//
     volSymmTensorField Lijd = (filter_(sqr(U)) - (sqr(filter_(U))));
+
     // Test-filter kinetic energy
-    const volScalarField ktest = 0.5 * tr(Lijd);
+    // const volScalarField ktest = 0.5 * tr(Lijd);
+    const volScalarField kTest("kTest", 0.5 * tr(Lijd));
+    if(this->runTime_.outputTime())
+    {
+        kTest .write();
+    }
+
     // Deviatoric part of Leonard stress and it's magnitude
     Lijd = dev(Lijd);
     const volScalarField magLd = sqrt(2.) * mag(Lijd);
@@ -305,7 +312,7 @@ void dynamicKEqnHeinz<BasicTurbulenceModel>::correct()
         Ckd_.primitiveFieldRef() =
         (
             (-rLS) * magLd /
-            ((2.*(deltaT*sqrt(max(ktest,this->kMin_*0.)))*magSdf)
+            ((2.*(deltaT*sqrt(max(kTest ,this->kMin_*0.)))*magSdf)
             + this->kMin_)
         );
 
