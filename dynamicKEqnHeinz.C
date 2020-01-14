@@ -236,29 +236,15 @@ void dynamicKEqnHeinz<BasicTurbulenceModel>::correct()
 
     tmp<volTensorField> tgradU(fvc::grad(U));
 
-    /*
-    S_ij-d and Omega_ij:
-
-    a) Important!!!! OpenFOAM defines grad(U) = dU_j/dxi -> hence we have to
-    use grad(U)^T (transpose) to make it match our Cartesian tensor notation!
-    b) gradU.T() should be trace-less due to continuity equation but deviates
-    slightly due to numerics
-    */
-
-    // const volSymmTensorField Sijd (dev(symm(tgradU())));
-    // const volTensorField     Rotij(skew(tgradU().T()));
-
     tmp<volVectorField> tUf = filter_(U);
     volVectorField& Uf = tUf.ref();
 
     // filtered S_ij-d and magnitude
     // (careful -> use Stefans deifinition abs(L) = sqrt(2 Lij Lji)
-    // const volSymmTensorField SijdF  = dev(filter_(Sijd));
     const volSymmTensorField SijdF(dev(symm(fvc::grad(Uf))));
     const volScalarField magSdf = sqrt(2.) * mag(SijdF);
 
     // Leonard stress --------------------------------------------------------//
-    // volSymmTensorField Lijd = (filter_(sqr(U)) - (sqr(filter_(U))));
     volSymmTensorField Lijd = (filter_(sqr(U)) - (sqr(Uf)));
     if(this->runTime_.outputTime())
     {
@@ -270,7 +256,6 @@ void dynamicKEqnHeinz<BasicTurbulenceModel>::correct()
 
 
     // Test-filter kinetic energy
-    // const volScalarField ktest = 0.5 * tr(Lijd);
     const volScalarField kTest("kTest", 0.5 * tr(Lijd));
     if(this->runTime_.outputTime())
     {
@@ -281,7 +266,6 @@ void dynamicKEqnHeinz<BasicTurbulenceModel>::correct()
     Lijd = dev(Lijd);
     const volScalarField magLd = sqrt(2.) * mag(Lijd);
 
-    // const volScalarField G(this->GName(), 0.5*tr(-twoSymm(B() & tgradU())));
     volScalarField G(this->GName(), nut*(tgradU() && dev(twoSymm(tgradU()))));
     tgradU.clear();
 
