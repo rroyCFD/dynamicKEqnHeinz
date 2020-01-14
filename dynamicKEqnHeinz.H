@@ -87,14 +87,11 @@ protected:
     // Protected data
 
         // Model constants
-            dimensionedScalar Ck_;
             dimensionedScalar Ckmin_;
             dimensionedScalar Ckmax_;
             dimensionedScalar Ce_;
 
             dimensionedScalar filterRatio_;
-
-            Switch  dynamic_;
 
         // Fields
 

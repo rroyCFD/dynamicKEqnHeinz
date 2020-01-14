@@ -81,15 +81,6 @@ dynamicKEqnHeinz<BasicTurbulenceModel>::dynamicKEqnHeinz
         transport,
         propertiesName
     ),
-    Ck_
-    (
-        dimensioned<scalar>::lookupOrAddToDict
-        (
-            "Ck",
-            this->coeffDict_,
-            0.094
-        )
-    ),
     Ckmin_
     (
         dimensioned<scalar>::lookupOrAddToDict
@@ -124,15 +115,6 @@ dynamicKEqnHeinz<BasicTurbulenceModel>::dynamicKEqnHeinz
             "filterRatio",
             this->coeffDict_,
             2.0
-        )
-    ),
-    dynamic_
-    (
-        Switch::lookupOrAddToDict
-        (
-            "dynamic",
-            this->coeffDict_,
-            true
         )
     ),
     k_
@@ -202,8 +184,6 @@ bool dynamicKEqnHeinz<BasicTurbulenceModel>::read()
         Ckmax_.readIfPresent(this->coeffDict());
         Ce_.readIfPresent(this->coeffDict());
         filterRatio_.readIfPresent(this->coeffDict());
-
-        dynamic_.readIfPresent("dynamic", this->coeffDict());
 
         filter_.read(this->coeffDict());
 
@@ -306,38 +286,31 @@ void dynamicKEqnHeinz<BasicTurbulenceModel>::correct()
     tgradU.clear();
 
 
-    if (dynamic_)
-    {
-        // Correlation coeffcients
-        dimensionedScalar small1
-        (
-            "small1",
-            dimensionSet(0, 2, -3, 0, 0, 0, 0),
-            SMALL
-        );
+    // Correlation coeffcients
+    dimensionedScalar small1
+    (
+        "small1",
+        dimensionSet(0, 2, -3, 0, 0, 0, 0),
+        SMALL
+    );
 
-        // Test-filter width
-        volScalarField deltaT = filterRatio_*this->delta();
+    // Test-filter width
+    volScalarField deltaT = filterRatio_*this->delta();
 
-        const volScalarField rLS =
-            (Lijd  && SijdF)/ (0.5*magLd*magSdf + small1);
+    const volScalarField rLS =
+        (Lijd  && SijdF)/ (0.5*magLd*magSdf + small1);
 
-        // Calculate the dynamic coeffcients
-        Ckd_.primitiveFieldRef() =
-        (
-            (-rLS) * magLd /
-            ((2.*(deltaT*sqrt(max(kTest ,this->kMin_*0.)))*magSdf)
-            + this->kMin_)
-        );
+    // Calculate the dynamic coeffcients
+    Ckd_.primitiveFieldRef() =
+    (
+        (-rLS) * magLd /
+        ((2.*(deltaT*sqrt(max(kTest ,this->kMin_*0.)))*magSdf)
+        + this->kMin_)
+    );
 
-        // Clipping of Ck
-        Ckd_.max(Ckmin_);
-        Ckd_.min(Ckmax_);
-    }
-    else
-    {
-        Ckd_ = Ck_;
-    }
+    // Clipping of Ck
+    Ckd_.max(Ckmin_);
+    Ckd_.min(Ckmax_);
 
     Info<< "Constant: Ck:"<< max(Ckd_).value()<< tab<< min(Ckd_).value()<< endl;
 
