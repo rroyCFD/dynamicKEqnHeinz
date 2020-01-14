@@ -249,7 +249,7 @@ void dynamicKEqnHeinz<BasicTurbulenceModel>::correct()
     const rhoField& rho = this->rho_;
     const surfaceScalarField& alphaRhoPhi = this->alphaRhoPhi_;
     const volVectorField& U = this->U_;
-    // volScalarField& nut = this->nut_;
+    volScalarField& nut = this->nut_;
     fv::options& fvOptions(fv::options::New(this->mesh_));
 
     LESeddyViscosity<BasicTurbulenceModel>::correct();
@@ -265,16 +265,29 @@ void dynamicKEqnHeinz<BasicTurbulenceModel>::correct()
     slightly due to numerics
     */
 
-    const volSymmTensorField Sijd (dev(symm(tgradU())));
+    // const volSymmTensorField Sijd (dev(symm(tgradU())));
     // const volTensorField     Rotij(skew(tgradU().T()));
+
+    tmp<volVectorField> tUf = filter_(U);
+    volVectorField& Uf = tUf.ref();
 
     // filtered S_ij-d and magnitude
     // (careful -> use Stefans deifinition abs(L) = sqrt(2 Lij Lji)
-    const volSymmTensorField SijdF  = dev(filter_(Sijd));
+    // const volSymmTensorField SijdF  = dev(filter_(Sijd));
+    const volSymmTensorField SijdF(dev(symm(fvc::grad(Uf))));
     const volScalarField magSdf = sqrt(2.) * mag(SijdF);
 
     // Leonard stress --------------------------------------------------------//
-    volSymmTensorField Lijd = (filter_(sqr(U)) - (sqr(filter_(U))));
+    // volSymmTensorField Lijd = (filter_(sqr(U)) - (sqr(filter_(U))));
+    volSymmTensorField Lijd = (filter_(sqr(U)) - (sqr(Uf)));
+    if(this->runTime_.outputTime())
+    {
+        Uf.rename("Ufilter");
+        Uf.write();
+    }
+
+    tUf.clear();
+
 
     // Test-filter kinetic energy
     // const volScalarField ktest = 0.5 * tr(Lijd);
@@ -288,7 +301,8 @@ void dynamicKEqnHeinz<BasicTurbulenceModel>::correct()
     Lijd = dev(Lijd);
     const volScalarField magLd = sqrt(2.) * mag(Lijd);
 
-    const volScalarField G(this->GName(), 0.5*tr(-twoSymm(B() & tgradU())));
+    // const volScalarField G(this->GName(), 0.5*tr(-twoSymm(B() & tgradU())));
+    volScalarField G(this->GName(), nut*(tgradU() && dev(twoSymm(tgradU()))));
     tgradU.clear();
 
 
@@ -344,8 +358,15 @@ void dynamicKEqnHeinz<BasicTurbulenceModel>::correct()
     fvOptions.correct(k_);
     bound(k_, this->kMin_);
 
+
     // update SGS viscosity
     correctNut();
+
+
+    if(this->runTime_.outputTime())
+    {
+        correctB();
+    }
 }
 
 
