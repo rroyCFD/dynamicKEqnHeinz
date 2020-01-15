@@ -36,6 +36,68 @@ namespace LESModels
 // * * * * * * * * * * * * Protected Member Functions  * * * * * * * * * * * //
 
 template<class BasicTurbulenceModel>
+void dynamicKEqnHeinz<BasicTurbulenceModel>::updateCkd(
+                                                    tmp<volTensorField>& tgradU)
+{
+    tmp<volVectorField> tUf = filter_(this->U_);
+    volVectorField& Uf = tUf.ref();
+
+    // filtered S_ij-d and magnitude
+    // (careful -> use Stefans deifinition abs(L) = sqrt(2 Lij Lji)
+    const volSymmTensorField SijdF(dev(symm(fvc::grad(Uf))));
+    const volScalarField magSdf = sqrt(2.) * mag(SijdF);
+
+    // Leonard stress --------------------------------------------------------//
+    volSymmTensorField Lijd = (filter_(sqr(this->U_)) - (sqr(Uf)));
+
+    // Test-filter kinetic energy
+    const volScalarField kTest("kTest", 0.5 * tr(Lijd));
+
+    if(this->runTime_.outputTime())
+    {
+        Uf.rename("Ufilter");
+        Uf.write();
+
+        kTest .write();
+    }
+    tUf.clear();
+
+    // Deviatoric part of Leonard stress and it's magnitude
+    Lijd = dev(Lijd);
+    const volScalarField magLd = sqrt(2.) * mag(Lijd);
+
+
+    // Correlation coeffcients
+    dimensionedScalar small1
+    (
+        "small1",
+        dimensionSet(0, 2, -3, 0, 0, 0, 0),
+        SMALL
+    );
+
+    // Test-filter width
+    volScalarField deltaT = filterRatio_*this->delta();
+
+    const volScalarField rLS =
+        (Lijd  && SijdF)/ (0.5*magLd*magSdf + small1);
+
+    // Calculate the dynamic coeffcients
+    Ckd_.primitiveFieldRef() =
+    (
+        (-rLS) * magLd /
+        ((2.*(deltaT*sqrt(max(kTest ,this->kMin_*0.)))*magSdf)
+        + this->kMin_)
+    );
+
+    // Clipping of Ck
+    Ckd_.max(Ckmin_);
+    Ckd_.min(Ckmax_);
+
+    Info<< "Constant: Ck:"<< max(Ckd_).value()<< tab<< min(Ckd_).value()<< endl;
+}
+
+
+template<class BasicTurbulenceModel>
 void dynamicKEqnHeinz<BasicTurbulenceModel>::correctNut()
 {
     this->nut_= Ckd_* this->delta() * sqrt(k_);
@@ -236,67 +298,11 @@ void dynamicKEqnHeinz<BasicTurbulenceModel>::correct()
 
     tmp<volTensorField> tgradU(fvc::grad(U));
 
-    tmp<volVectorField> tUf = filter_(U);
-    volVectorField& Uf = tUf.ref();
-
-    // filtered S_ij-d and magnitude
-    // (careful -> use Stefans deifinition abs(L) = sqrt(2 Lij Lji)
-    const volSymmTensorField SijdF(dev(symm(fvc::grad(Uf))));
-    const volScalarField magSdf = sqrt(2.) * mag(SijdF);
-
-    // Leonard stress --------------------------------------------------------//
-    volSymmTensorField Lijd = (filter_(sqr(U)) - (sqr(Uf)));
-    if(this->runTime_.outputTime())
-    {
-        Uf.rename("Ufilter");
-        Uf.write();
-    }
-
-    tUf.clear();
-
-
-    // Test-filter kinetic energy
-    const volScalarField kTest("kTest", 0.5 * tr(Lijd));
-    if(this->runTime_.outputTime())
-    {
-        kTest .write();
-    }
-
-    // Deviatoric part of Leonard stress and it's magnitude
-    Lijd = dev(Lijd);
-    const volScalarField magLd = sqrt(2.) * mag(Lijd);
+    // update dynamic Ck coefficient field
+    updateCkd(tgradU);
 
     volScalarField G(this->GName(), nut*(tgradU() && dev(twoSymm(tgradU()))));
     tgradU.clear();
-
-
-    // Correlation coeffcients
-    dimensionedScalar small1
-    (
-        "small1",
-        dimensionSet(0, 2, -3, 0, 0, 0, 0),
-        SMALL
-    );
-
-    // Test-filter width
-    volScalarField deltaT = filterRatio_*this->delta();
-
-    const volScalarField rLS =
-        (Lijd  && SijdF)/ (0.5*magLd*magSdf + small1);
-
-    // Calculate the dynamic coeffcients
-    Ckd_.primitiveFieldRef() =
-    (
-        (-rLS) * magLd /
-        ((2.*(deltaT*sqrt(max(kTest ,this->kMin_*0.)))*magSdf)
-        + this->kMin_)
-    );
-
-    // Clipping of Ck
-    Ckd_.max(Ckmin_);
-    Ckd_.min(Ckmax_);
-
-    Info<< "Constant: Ck:"<< max(Ckd_).value()<< tab<< min(Ckd_).value()<< endl;
 
     tmp<fvScalarMatrix> kEqn
     (

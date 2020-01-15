@@ -108,8 +108,13 @@ protected:
 
     // Protected Member Functions
 
+        //- Update dynamic Ck coefficient field
+        virtual void updateCkd(tmp<volTensorField>&);
+
         //- Update sub-grid eddy-viscosity
         virtual void correctNut();
+
+        //- Update SGS stress (write on write only)
         virtual void correctB();
 
 public:
