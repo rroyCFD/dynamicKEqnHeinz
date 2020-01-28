@@ -116,6 +116,7 @@ protected:
 
         //- Update SGS stress (write on write only)
         virtual void correctB();
+        virtual void correctB(tmp<volTensorField>& );
 
 public:
 

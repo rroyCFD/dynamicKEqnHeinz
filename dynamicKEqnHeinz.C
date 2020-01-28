@@ -111,11 +111,19 @@ void dynamicKEqnHeinz<BasicTurbulenceModel>::correctNut()
 template<class BasicTurbulenceModel>
 void dynamicKEqnHeinz<BasicTurbulenceModel>::correctB()
 {
+    Info << "Initializing SGS stress B" << endl;
     B_= ((2.0/3.0)*I)*k_ - 2.0*this->nut_*symm(dev(fvc::grad(this->U_)));
     B_.correctBoundaryConditions();
 }
 
-
+template<class BasicTurbulenceModel>
+void dynamicKEqnHeinz<BasicTurbulenceModel>::correctB
+(tmp<volTensorField>& tgradU)
+{
+    Info << "Correcting SGS stress B" << endl;
+    B_= ((2.0/3.0)*I)*k_ - 2.0*this->nut_*symm(dev(tgradU));
+    B_.correctBoundaryConditions();
+}
 
 // * * * * * * * * * * * * * * * * Constructors  * * * * * * * * * * * * * * //
 
@@ -215,8 +223,7 @@ dynamicKEqnHeinz<BasicTurbulenceModel>::dynamicKEqnHeinz
             IOobject::AUTO_WRITE
         ),
         this->mesh_,
-        dimensionedSymmTensor
-            ("B", dimensionSet(0, 2, -2, 0, 0, 0, 0), symmTensor::zero)
+        dimensionedSymmTensor ("B", k_.dimensions(), symmTensor::zero)
     ),
     simpleFilter_(this->mesh_),
     filterPtr_(LESfilter::New(this->mesh_, this->coeffDict())),
@@ -224,7 +231,7 @@ dynamicKEqnHeinz<BasicTurbulenceModel>::dynamicKEqnHeinz
 {
     bound(k_, this->kMin_);
 
-    // update SGS stress B
+    // update SGS stress tensor B
     correctB();
 
     if (type == typeName)
@@ -302,7 +309,7 @@ void dynamicKEqnHeinz<BasicTurbulenceModel>::correct()
     updateCkd(tgradU);
 
     volScalarField G(this->GName(), nut*(tgradU() && dev(twoSymm(tgradU()))));
-    tgradU.clear();
+    // tgradU.clear();
 
     tmp<fvScalarMatrix> kEqn
     (
@@ -325,11 +332,10 @@ void dynamicKEqnHeinz<BasicTurbulenceModel>::correct()
     // update SGS viscosity
     correctNut();
 
+    // update SGS stress tensor
+    correctB(tgradU);
 
-    if(this->runTime_.outputTime())
-    {
-        correctB();
-    }
+    tgradU.clear();
 }
 
 
