@@ -55,7 +55,7 @@ void dynamicKEqnHeinz<BasicTurbulenceModel>::updateCkd(
 
     if(this->runTime_.outputTime())
     {
-        Uf.rename("Ufilter");
+        Uf.rename("U-SGSFilter");
         Uf.write();
 
         kTest .write();
