@@ -81,7 +81,6 @@ class dynamicKEqnHeinz
         dynamicKEqnHeinz(const dynamicKEqnHeinz&);
         void operator=(const dynamicKEqnHeinz&);
 
-
 protected:
 
     // Protected data
@@ -92,6 +91,8 @@ protected:
             dimensionedScalar Ce_;
 
             dimensionedScalar filterRatio_;
+
+            Switch calcMoreFields_;
 
         // Fields
 

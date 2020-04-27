@@ -49,18 +49,19 @@ void dynamicKEqnHeinz<BasicTurbulenceModel>::updateCkd(
 
     // Leonard stress --------------------------------------------------------//
     volSymmTensorField Lijd = (filter_(sqr(this->U_)) - (sqr(Uf)));
-
-    // Test-filter kinetic energy
-    const volScalarField kTest("kTest", 0.5 * tr(Lijd));
-
-    if(this->runTime_.outputTime())
+    if(calcMoreFields_ && this->runTime_.outputTime())
     {
         Uf.rename("U-SGSFilter");
         Uf.write();
-
-        kTest .write();
     }
     tUf.clear();
+
+    // Test-filter kinetic energy
+    const volScalarField kTest("kTest", 0.5 * tr(Lijd));
+    if(calcMoreFields_ && this->runTime_.outputTime())
+    {
+        kTest .write();
+    }
 
     // Deviatoric part of Leonard stress and it's magnitude
     Lijd = dev(Lijd);
@@ -93,7 +94,7 @@ void dynamicKEqnHeinz<BasicTurbulenceModel>::updateCkd(
     Ckd_.max(Ckmin_);
     Ckd_.min(Ckmax_);
 
-    Info<< "Constant: Ck:"<< max(Ckd_).value()<< tab<< min(Ckd_).value()<< endl;
+    Info << "Ck min:" << gMin(Ckd_) << "\tmax: " << gMax(Ckd_) << endl;
 }
 
 
@@ -187,6 +188,15 @@ dynamicKEqnHeinz<BasicTurbulenceModel>::dynamicKEqnHeinz
             2.0
         )
     ),
+    calcMoreFields_
+    (
+        Switch::lookupOrAddToDict
+        (
+            "calcMoreFields",
+            this->coeffDict_,
+            false
+         )
+    ),
     k_
     (
         IOobject
@@ -232,7 +242,10 @@ dynamicKEqnHeinz<BasicTurbulenceModel>::dynamicKEqnHeinz
     bound(k_, this->kMin_);
 
     // update SGS stress tensor B
-    correctB();
+    if(calcMoreFields_)
+    {
+        correctB();
+    }
 
     if (type == typeName)
     {
@@ -253,6 +266,7 @@ bool dynamicKEqnHeinz<BasicTurbulenceModel>::read()
         Ckmax_.readIfPresent(this->coeffDict());
         Ce_.readIfPresent(this->coeffDict());
         filterRatio_.readIfPresent(this->coeffDict());
+        calcMoreFields_.readIfPresent("calcMoreFields", this->coeffDict());
 
         filter_.read(this->coeffDict());
 
@@ -333,7 +347,10 @@ void dynamicKEqnHeinz<BasicTurbulenceModel>::correct()
     correctNut();
 
     // update SGS stress tensor
-    correctB(tgradU);
+    if(calcMoreFields_)
+    {
+        correctB(tgradU);
+    }
 
     tgradU.clear();
 }
